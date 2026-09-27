@@ -40,7 +40,11 @@ void armNativeCrashReporter(String directory) {
         Int32 Function(Pointer<Utf8>, Pointer<Utf8>, Int32),
         int Function(Pointer<Utf8>, Pointer<Utf8>, int)
       >('setenv');
-      setenv('DUANJU_CRASH_DIR'.toNativeUtf8(), directory.toNativeUtf8(), 1);
+      setenv(
+        'DUANJU_CRASH_DIR'.toNativeUtf8(),
+        directory.toNativeUtf8(),
+        1,
+      );
     } catch (_) {
       // 即便设置失败，崩溃也会回退到 /sdcard/native_crash.txt
     }
@@ -53,7 +57,8 @@ String _nativeRequest(String body) {
     library = DynamicLibrary.open('libduanju_core.so');
     if (_crashDir != null && !_crashHandlerArmed) {
       try {
-        final setDir = library.lookupFunction<_NativeSetCrashDir, _DartSetCrashDir>(
+        final setDir =
+            library.lookupFunction<_NativeSetCrashDir, _DartSetCrashDir>(
           'DuanjuSetCrashDir',
         );
         setDir(_crashDir!.toNativeUtf8());
