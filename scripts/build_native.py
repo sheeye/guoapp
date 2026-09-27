@@ -63,7 +63,7 @@ if options.platform == 'android':
         if architecture == 'arm':
             extra['GOARM'] = '7'
         if architecture == 'arm64':
-            extra['GOARM64'] = 'v8.0a'
+            extra['GOARM64'] = 'v8.0'
         if architecture == 'amd64':
             extra['GOAMD64'] = 'v1'
         build('android', architecture, compiler, output, extra)
