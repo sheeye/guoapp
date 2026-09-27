@@ -2,7 +2,6 @@ package main
 
 /*
 #include <signal.h>
-#include <execinfo.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -50,6 +49,7 @@ static void resolve_lib(void* addr, char* out, size_t outlen) {
 }
 
 static void crash_handler(int sig, siginfo_t* info, void* ucontext) {
+    (void)ucontext;
     char path[1100];
     if (have_dir) snprintf(path, sizeof(path), "%s/native_crash.txt", crash_dir);
     else snprintf(path, sizeof(path), "/sdcard/native_crash.txt");
@@ -64,14 +64,6 @@ static void crash_handler(int sig, siginfo_t* info, void* ucontext) {
             char lib[300];
             resolve_lib(info->si_addr, lib, sizeof(lib));
             fprintf(f, "fault_in=%s\n", lib);
-        }
-        void* bt[64];
-        int n = backtrace(bt, 64);
-        fprintf(f, "backtrace(%d):\n", n);
-        for (int i = 0; i < n; i++) {
-            char lib[300];
-            resolve_lib(bt[i], lib, sizeof(lib));
-            fprintf(f, "  #%d %p in %s\n", i, bt[i], lib);
         }
         fclose(f);
     }
