@@ -7,6 +7,8 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:media_kit/media_kit.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:window_manager/window_manager.dart';
+import 'package:path/path.dart' as p;
+import 'package:path_provider/path_provider.dart';
 
 import 'core_bridge.dart';
 import 'app_layout.dart';
@@ -21,6 +23,16 @@ import 'player_screen.dart';
 
 Future<void> main(List<String> arguments) async {
   WidgetsFlutterBinding.ensureInitialized();
+  String? crashReport;
+  try {
+    final docs = await getApplicationDocumentsDirectory();
+    armNativeCrashReporter(docs.path);
+    final crashFile = File(p.join(docs.path, 'native_crash.txt'));
+    if (await crashFile.exists()) {
+      crashReport = await crashFile.readAsString();
+      await crashFile.delete();
+    }
+  } catch (_) {}
   if (Platform.isAndroid) {
     await SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
     SystemChrome.setSystemUIOverlayStyle(AppTheme.systemBars(Brightness.dark));
@@ -29,6 +41,10 @@ Future<void> main(List<String> arguments) async {
     await windowManager.ensureInitialized();
   }
   MediaKit.ensureInitialized();
+  if (crashReport != null) {
+    runApp(CrashReportApp(report: crashReport));
+    return;
+  }
   if (Platform.isWindows && arguments.firstOrNull == '--package-smoke') {
     await runPackageSmoke(arguments);
     return;
@@ -279,5 +295,30 @@ class DuanjuApp extends StatelessWidget {
               ),
             ),
           ),
+  );
+}
+
+class CrashReportApp extends StatelessWidget {
+  const CrashReportApp({super.key, required this.report});
+  final String report;
+  @override
+  Widget build(BuildContext context) => MaterialApp(
+    debugShowCheckedModeBanner: false,
+    theme: AppTheme.dark,
+    home: Scaffold(
+      appBar: AppBar(title: const Text('原生崩溃报告')),
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.all(16),
+        child: SelectableText(
+          report,
+          style: const TextStyle(fontFamily: 'monospace', fontSize: 13),
+        ),
+      ),
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: () => runApp(const AppBootstrap()),
+        label: const Text('重新打开'),
+        icon: const Icon(Icons.refresh),
+      ),
+    ),
   );
 }
