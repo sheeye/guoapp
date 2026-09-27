@@ -24,11 +24,42 @@ typedef _NativeRequest = Pointer<Utf8> Function(Pointer<Utf8>);
 typedef _DartRequest = Pointer<Utf8> Function(Pointer<Utf8>);
 typedef _NativeFree = Void Function(Pointer<Utf8>);
 typedef _DartFree = void Function(Pointer<Utf8>);
+typedef _NativeSetCrashDir = Void Function(Pointer<Utf8>);
+typedef _DartSetCrashDir = void Function(Pointer<Utf8>);
+
+String? _crashDir;
+bool _crashHandlerArmed = false;
+
+/// 在打开原生库之前调用：设置崩溃报告写入目录，并通过环境变量让库加载期的崩溃也能被捕获。
+void armNativeCrashReporter(String directory) {
+  _crashDir = directory;
+  if (Platform.isAndroid) {
+    try {
+      final libc = DynamicLibrary.process();
+      final setenv = libc.lookupFunction<
+        Int32 Function(Pointer<Utf8>, Pointer<Utf8>, Int32),
+        int Function(Pointer<Utf8>, Pointer<Utf8>, int)
+      >('setenv');
+      setenv('DUANJU_CRASH_DIR'.toNativeUtf8(), directory.toNativeUtf8(), 1);
+    } catch (_) {
+      // 即便设置失败，崩溃也会回退到 /sdcard/native_crash.txt
+    }
+  }
+}
 
 String _nativeRequest(String body) {
   final DynamicLibrary library;
   if (Platform.isAndroid) {
     library = DynamicLibrary.open('libduanju_core.so');
+    if (_crashDir != null && !_crashHandlerArmed) {
+      try {
+        final setDir = library.lookupFunction<_NativeSetCrashDir, _DartSetCrashDir>(
+          'DuanjuSetCrashDir',
+        );
+        setDir(_crashDir!.toNativeUtf8());
+        _crashHandlerArmed = true;
+      } catch (_) {}
+    }
   } else if (Platform.isWindows) {
     library = DynamicLibrary.open(
       path.join(path.dirname(Platform.resolvedExecutable), 'duanju_core.dll'),
