@@ -62,6 +62,10 @@ if options.platform == 'android':
         extra = {'CGO_LDFLAGS': '-Wl,-z,max-page-size=16384'}
         if architecture == 'arm':
             extra['GOARM'] = '7'
+        if architecture == 'arm64':
+            extra['GOARM64'] = 'v8.0a'
+        if architecture == 'amd64':
+            extra['GOAMD64'] = 'v1'
         build('android', architecture, compiler, output, extra)
 elif options.platform == 'windows':
     compiler = shutil.which('x86_64-w64-mingw32-gcc') or (shutil.which('gcc') if platform.system() == 'Windows' else None)
