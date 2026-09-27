@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'dart:async';
+import 'dart:ffi';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -24,15 +25,22 @@ import 'player_screen.dart';
 Future<void> main(List<String> arguments) async {
   WidgetsFlutterBinding.ensureInitialized();
   String? crashReport;
+  String? docsPath;
   try {
     final docs = await getApplicationDocumentsDirectory();
-    armNativeCrashReporter(docs.path);
+    docsPath = docs.path;
     final crashFile = File(p.join(docs.path, 'native_crash.txt'));
     if (await crashFile.exists()) {
       crashReport = await crashFile.readAsString();
       await crashFile.delete();
     }
   } catch (_) {}
+  // 已有上次崩溃报告：直接展示并退出，绝不再加载任何原生库，
+  // 否则若崩溃恰好发生在核心库加载期，会再次被系统杀掉、报告永远出不来。
+  if (crashReport != null) {
+    runApp(CrashReportApp(report: crashReport));
+    return;
+  }
   if (Platform.isAndroid) {
     await SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
     SystemChrome.setSystemUIOverlayStyle(AppTheme.systemBars(Brightness.dark));
@@ -40,11 +48,17 @@ Future<void> main(List<String> arguments) async {
   if (Platform.isWindows) {
     await windowManager.ensureInitialized();
   }
-  MediaKit.ensureInitialized();
-  if (crashReport != null) {
-    runApp(CrashReportApp(report: crashReport));
-    return;
+  // 在初始化播放器之前先加载原生核心，让其 init() 装好信号处理器，
+  // 否则 media_kit / libmpv 的崩溃会在处理器就绪前直接杀死进程、写不出报告。
+  if (Platform.isAndroid && docsPath != null) {
+    try {
+      armNativeCrashReporter(docsPath);
+      DynamicLibrary.open('libduanju_core.so');
+    } catch (_) {
+      // 加载失败会在后续真正调用时再暴露
+    }
   }
+  MediaKit.ensureInitialized();
   if (Platform.isWindows && arguments.firstOrNull == '--package-smoke') {
     await runPackageSmoke(arguments);
     return;
